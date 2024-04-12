@@ -1,10 +1,11 @@
 package server
 
 import (
+	"database/sql"
 	"net/http"
 )
 
-func InitializeRoutes() {
+func InitializeRoutes(db *sql.DB) {
 	http.HandleFunc("/", HomeHandler)
-	http.HandleFunc("createuser", CreateUserHandler)
+	http.HandleFunc("/users", UserHandler(db))
 }

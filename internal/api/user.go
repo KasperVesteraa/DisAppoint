@@ -1,10 +1,10 @@
 package api
 
 type User struct {
-	Id       string
-	Name     string
-	Email    string
-	Password string
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 func CreateUser(id, name, email, password string) (*User, error) {
