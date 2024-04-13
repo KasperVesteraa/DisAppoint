@@ -30,20 +30,20 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 			}
 			w.WriteHeader(http.StatusCreated)
 			fmt.Fprintf(w, "User created successfully!\n")
-		case http.MethodDelete: // Delete
+		case http.MethodGet: // Read
+			email := r.URL.Query().Get("email")
+			if email == "" {
+				http.Error(w, "Email parameter required", http.StatusBadRequest)
+				return
+			}
 			var user api.User
-			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			defer r.Body.Close()
-			_, err := db.Exec("DELETE FROM users WHERE email = $1", user.Email)
+			row := db.QueryRow("SELECT id, name, email, password FROM users WHERE email = $1", email)
+			err := row.Scan(&user.Id, &user.Name, &user.Email, &user.Password)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "User not found", http.StatusNotFound)
 				return
 			}
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "User deleted successfully!\n")
+			json.NewEncoder(w).Encode(user)
 		case http.MethodPut: // Update
 			var user api.User
 			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
@@ -58,6 +58,20 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 			}
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "User updated succesfully!\n")
+		case http.MethodDelete: // Delete
+			var user api.User
+			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+			_, err := db.Exec("DELETE FROM users WHERE email = $1", user.Email)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "User deleted successfully!\n")
 		default:
 			http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
 		}
