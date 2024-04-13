@@ -37,13 +37,30 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 			var user api.User
 			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
+			defer r.Body.Close()
 			_, err := db.Exec("INSERT INTO users (id, name, email, password) VALUES ($1, $2, $3, $4)", user.Id, user.Name, user.Email, user.Password)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			w.WriteHeader(http.StatusCreated)
 			fmt.Fprintf(w, "User created successfully!\n")
+		case http.MethodDelete:
+			var user api.User
+			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+			_, err := db.Exec("DELETE FROM users WHERE email = $1", user.Email)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "User deleted successfully!\n")
 		default:
 			http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
 		}
