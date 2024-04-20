@@ -8,4 +8,5 @@ import (
 func InitializeRoutes(db *sql.DB) {
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/users", UserHandler(db))
+	http.HandleFunc("/appointments", AppointmentHandler(db))
 }
