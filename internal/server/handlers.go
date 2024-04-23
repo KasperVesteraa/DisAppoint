@@ -23,7 +23,7 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			defer r.Body.Close()
-			row := db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email)
+			row := db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email) // Check if user already exists
 			var id string
 			if err := row.Scan(&id); err == nil {
 				http.Error(w, "User already exists", http.StatusConflict)
@@ -98,6 +98,13 @@ func AppointmentHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			defer r.Body.Close()
+			row := db.QueryRow("SELECT title FROM appointments WHERE author_id = $1 AND start_time = $2", appt.AuthorId, appt.StartTime) // Check if appointment already exists
+			var title string
+			if err := row.Scan(&title); err == nil {
+				http.Error(w, "Appointment already exists", http.StatusConflict)
+				return
+			}
+			appt.CreateUuid()
 			_, err := db.Exec("INSERT INTO appointments (id, title, location, description, start_time, end_time, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7)", appt.Id, appt.Title, appt.Location, appt.Description, appt.StartTime, appt.EndTime, appt.AuthorId)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,21 +121,71 @@ func AppointmentHandler(db *sql.DB) http.HandlerFunc {
 			fmt.Fprintf(w, "Appointment created successfully!\n")
 
 		case http.MethodGet: // Read
+			author_id := r.URL.Query().Get("author_id")
+			if author_id == "" {
+				http.Error(w, "Author parameter required", http.StatusBadRequest)
+				return
+			}
+			start_time := r.URL.Query().Get("start_time")
+			if start_time == "" {
+				http.Error(w, "StarTime parameter required", http.StatusBadRequest)
+				return
+			}
+			var appt api.Appointment
+			row1 := db.QueryRow("SELECT * FROM appointments WHERE author_id = $1 AND start_time = $2", author_id, start_time)
+			err1 := row1.Scan(&appt.Id, &appt.Title, &appt.Location, &appt.Description, &appt.StartTime, &appt.EndTime, &appt.AuthorId)
+			if err1 != nil {
+				if err1 == sql.ErrNoRows {
+					http.Error(w, "No appointment found", http.StatusNotFound)
+				} else {
+					http.Error(w, err1.Error(), http.StatusInternalServerError)
+				}
+			}
+			// Fetch participants for the appointment
+			var parts_id []string
+			rows, err2 := db.Query("SELECT u.id, u.name, u.email FROM users u JOIN appointment_participants ap ON u.id = ap.user_id	WHERE ap.appointment_id = $1", appt.Id)
+			if err2 != nil {
+				http.Error(w, err2.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var participant api.User
+				if err := rows.Scan(&participant.Id, &participant.Name, &participant.Email); err != nil {
+					http.Error(w, "Error reading participant data", http.StatusInternalServerError)
+					return
+				}
+				parts_id = append(parts_id, participant.Id)
+			}
+			if err := rows.Err(); err != nil {
+				http.Error(w, "Error iterating participant data", http.StatusInternalServerError)
+				return
+			}
+			appt.Parts_id = parts_id
+			json.NewEncoder(w).Encode(appt)
+
 		case http.MethodPut: // Update
 		case http.MethodDelete: // Delete
 		}
 	}
 }
 
+// type User struct {
+// 	Id       string `json:"id"`
+// 	Name     string `json:"name"`
+// 	Email    string `json:"email"`
+// 	Password string `json:"password"`
+// }
+
 // type Appointment struct {
-// 	Id           string
-// 	Title        string
-// 	Location     string
-// 	Description  string
-// 	StartTime    int
-// 	EndTime      int
-// 	Author       User
-// 	Participants []User
+// 	Id          string   `json:"id"`
+// 	Title       string   `json:"title"`
+// 	Location    string   `json:"location"`
+// 	Description string   `json:"description"`
+// 	StartTime   int      `json:"start_time"`
+// 	EndTime     int      `json:"end_time"`
+// 	AuthorId    string   `json:"author_id"`
+// 	Parts_id    []string `json:"parts_id"`
 // }
 
 // CREATE TABLE IF NOT EXISTS users (
