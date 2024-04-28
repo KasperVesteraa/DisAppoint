@@ -69,19 +69,23 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 			fmt.Fprintf(w, "User updated succesfully!\n")
 
 		case http.MethodDelete: // Delete
-			var user api.User
-			if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+			email := r.URL.Query().Get("email")
+			if email == "" {
+				http.Error(w, "Email parameter required", http.StatusBadRequest)
 				return
 			}
-			defer r.Body.Close()
-			_, err := db.Exec("DELETE FROM users WHERE email = $1", user.Email)
+			res, err := db.Exec("DELETE FROM users WHERE email = $1", email)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			if rows, _ := res.RowsAffected(); rows == 0 {
+				http.Error(w, "No user found", http.StatusNotFound)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "User deleted successfully!\n")
+
 		default:
 			http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
 		}
@@ -91,29 +95,6 @@ func UserHandler(db *sql.DB) http.HandlerFunc {
 func AppointmentHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-
-		case http.MethodDelete: // Delete
-			author_id := r.URL.Query().Get("author_id")
-			if author_id == "" {
-				http.Error(w, "Author id parameter required", http.StatusBadRequest)
-				return
-			}
-			start_time := r.URL.Query().Get("start_time")
-			if start_time == "" {
-				http.Error(w, "Start time parameter required", http.StatusBadRequest)
-				return
-			}
-			res, err := db.Exec("DELETE FROM appointments WHERE author_id = $1 AND start_time = $2", author_id, start_time)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			if rows, _ := res.RowsAffected(); rows == 0 {
-				http.Error(w, "No appointment found", http.StatusNotFound)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "Appointment deleted successfully!\n")
 
 		case http.MethodPost: // Create
 			var appt api.Appointment
@@ -190,6 +171,29 @@ func AppointmentHandler(db *sql.DB) http.HandlerFunc {
 			json.NewEncoder(w).Encode(appt)
 
 		case http.MethodPut: // Update
+
+		case http.MethodDelete: // Delete
+			author_id := r.URL.Query().Get("author_id")
+			if author_id == "" {
+				http.Error(w, "Author id parameter required", http.StatusBadRequest)
+				return
+			}
+			start_time := r.URL.Query().Get("start_time")
+			if start_time == "" {
+				http.Error(w, "Start time parameter required", http.StatusBadRequest)
+				return
+			}
+			res, err := db.Exec("DELETE FROM appointments WHERE author_id = $1 AND start_time = $2", author_id, start_time)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if rows, _ := res.RowsAffected(); rows == 0 {
+				http.Error(w, "No appointment found", http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "Appointment deleted successfully!\n")
 		}
 	}
 }
